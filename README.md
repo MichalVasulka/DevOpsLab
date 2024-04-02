@@ -154,6 +154,32 @@ backend:  python3 app.py
 backend is writing data to sqlite database "locally". 
 Term "local" can have different meanings in context of containerised apps. 
 
+## scenario_0
+
+super simple flask app
+
+build image locally (from scenario dir)
+
+```bash
+docker build -t myimage .
+```
+
+start container
+
+```bash
+docker run -it --name simple-app -p 8000:8000 myimage
+```
+
+handle with docker compose
+```bash
+docker-compose up
+```
+
+check with curl
+```bash
+curl http://localhost:8000/
+```
+
 ## scenario_1
 
 Basic flask app
@@ -161,17 +187,27 @@ Basic flask app
 build images locally
 
 ```bash
-docker build -t
-docker build -t
+docker-compose build
+docker-compose up # performs build if needed
+
+# direct builds
+docker build -t backend-img .
+docker build -t frontend-img .
 ```
 
-start frontend and backend containers
+start frontend and backend containers directly
 
 ```bash
-docker run -it -e -p 5100:5100 your-backend-docker-image
-docker run -it -e ENV=prod --name frontend -p 8080:8080 your-frontend-docker-image
-docker run -d -e ENV=prod --name frontend -p 8080:8080 your-frontend-docker-image
+docker run -it --rm --name backend -p 5100:5100 backend-img
+docker run -it --rm --add-host=host.docker.internal:host-gateway -e ENV=prod --name frontend -p 8080:8080 frontend-img
+# daemonized example
+docker run -d <other params>
 ```
+
+check functionality with browser on http://localhost:8080
+
+check data persistence after docker just killing docker-compose,compose down, docker system prune 
+
 
 verify env var is present within container
 ```docker exec -it frontend bash -c 'echo "$ENV"'```
