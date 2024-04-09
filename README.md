@@ -63,6 +63,7 @@ Docker and containers in general offer following benefits:
 - provides level of abstraction - when expanding app functionality, we can create just new microservice -> thinking on API/microservice level
 - allows for easy combination of different technologies (app can have both express and flask backends, can use multiple separate DBs - Postreg + Mongo). If having multiple technologies within one project is good idea, that is another question.
 - app in container thinks it is running in regular VM (not entirely true, there are some docker specific directives app can call, such as ```host.docker.internal``` directive and Docker DNS), we can let app know it runs in container by injecting env variables
+- static security scanning of each image (easy to see vulnerabilities of you app in given build), we can see security vulnerabilities per image layer
 - app can be built by parts as Lego
 
 
@@ -247,6 +248,49 @@ docker run -d -p 80:80 flask-frontend
 ```
 
 
+## Docker networking
+
+when using host.docker.internal trick, you might encounter issues communicating between containers.
+Eg. one backend container having issues contacting second backend container running on different port in different container.
+
+How to t-shoot:
+using ```docker exec``` run curl from within the container like
+
+```bash
+curl "http://host.docker.internal:5000/api/healthcheck"
+```
+
+(where the other container runs on port 5000)
+
+
+
+Likely firewall will be causing the issues.
+
+```bash
+sudo ufw status
+
+sudo ufw allow <port>   # maybe not needed and exposes port to the outside
+
+sudo ufw allow in on docker0
+
+sudo ufw reload
+
+sudo ufw status
+```
+
+
+## What is 'localhost' ?
+
+When dealing with containers, we need to be careful about what we mean by localhost.
+When running the app on host VM, the localhost is the VM itself. Such app can reach other apps running on different ports without issues.
+
+When running app within container, the localhost is the container itself. It will not be able (by default) to reach other apps with calls like ```curl http://localhost:5000/api/healthcheck```.
+
+Caveat:
+When using web frameworks that distinguish server-side and client-side rendering, we need to be extra careful. Localhost for server-side rendering is the VM/container app runs on. Localhost on client-side rendered code is the machine of end user (laptop/tablet/smartphone). This is common cause for errors when calling backend api endpoints from frontend.
+
+
+
 
 
 ## General Docker notes
@@ -403,7 +447,118 @@ docker run -d -it --security-opt=no-new-privileges <myimage>
 uses linux kernel feature that prevents priv escalation, our docker app will not be able to use ```setuid```
 for example (```setuid``` allows for rights escalation). This helps to prevent container breakout to host VM.
 
+## AppArmor
 
+Additional security layer for containers
+
+documentation for Ubuntu
+https://ubuntu.com/server/docs/security-apparmor
+
+It is regular apt package
+```bash
+sudo apt install apparmor-profiles
+```
+
+from docker docs:
+https://docs.docker.com/engine/security/apparmor/
+
+AppArmor security profiles for Docker
+AppArmor (Application Armor) is a Linux security module that protects an operating system and its applications from security threats. To use it, a system administrator associates an AppArmor security profile with each program. Docker expects to find an AppArmor policy loaded and enforced.
+
+Docker automatically generates and loads a default profile for containers named docker-default. The Docker binary generates this profile in tmpfs and then loads it into the kernel.
+
+Note:
+This profile is used on containers, not on the Docker daemon.
+
+example how to run hardened container secured with AppArmor:
+
+```bash
+docker run --rm -it --security-opt apparmor=docker-default hello-world
+```
+
+```bash
+coil@devVM:~/Desktop/DevOpsLab$ sudo apparmor_status
+[sudo] password for coil: 
+apparmor module is loaded.
+47 profiles are loaded.
+42 profiles are in enforce mode.
+   ...
+   docker-default                   <--  OUR DEFAULT DOCKER PROFILE in ENFORCE MODE
+   libreoffice-senddoc
+   libreoffice-soffice//gpg
+   libreoffice-xpdfimport
+   lsb_release
+   man_filter
+   man_groff
+   nvidia_modprobe
+   ...
+5 profiles are in complain mode.
+   /usr/sbin/sssd
+   libreoffice-oosplash
+   libreoffice-soffice
+   snap.code.code
+   snap.code.url-handler
+0 profiles are in kill mode.
+0 profiles are in unconfined mode.
+19 processes have profiles defined.
+2 processes are in enforce mode.
+...
+17 processes are in complain mode.
+...
+   /usr/bin/bash (...) snap.code.code
+   /usr/bin/bash (...) snap.code.code
+   /usr/bin/bash (...) snap.code.code
+...
+0 processes are unconfined but have a profile defined.
+0 processes are in mixed mode.
+0 processes are in kill mode.
+coil@devVM:~/Desktop/DevOpsLab$ docker run --rm -it --security-opt apparmor=docker-default hello-world
+...
+Status: Downloaded newer image for hello-world:latest
+...
+Hello from Docker!
+...
+coil@devVM:~/Desktop/DevOpsLab$ 
+```
+
+Useful AppArmor links:
+- https://docs.docker.com/engine/security/apparmor/
+- https://dockerlabs.collabnix.com/advanced/security/apparmor/
+- https://security.padok.fr/en/blog/security-docker-apparmor
+- https://test-dockerrr.readthedocs.io/en/latest/security/apparmor/
+- https://gcore.com/learning/advanced-docker-security-with-apparmor/
+
+
+
+## Image Security Scanning
+
+login to your DockerHub account, use your access token.
+
+Our example image with security scan:
+https://hub.docker.com/repository/docker/swilab/backend-img/general
+
+
+```bash
+docker login -u swilab
+
+cd <somedir w dockerfile>
+docker build -t swilab/backend-img .
+docker push swilab/backend-img
+
+# paid feature - static scanning on DockerHub
+# docker scan swilab/backend-img:latest
+```
+
+Static image scanning with 'Snyk' is paid feature on DockerHub.
+
+New Docker Scout vulnerability scan is free for 3 DockerHub repos.
+
+Our lab image security scan is available via DockerHub GUI:
+https://scout.docker.com/reports/org/swilab/vulnerabilities?stream=latest-indexed
+
+Links
+- https://docs.docker.com/scout/
+- https://github.com/docker/scout-cli
 
 
 
