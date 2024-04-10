@@ -155,6 +155,14 @@ backend:  python3 app.py
 backend is writing data to sqlite database "locally". 
 Term "local" can have different meanings in context of containerised apps. 
 
+## Note
+Regarding Docker Compose commands.
+if 
+```docker-compose up``` 
+doesn't work, then use command without dash
+```docker compose up```
+
+
 ## scenario_0
 
 super simple flask app
