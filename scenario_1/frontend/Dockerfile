@@ -5,14 +5,15 @@ FROM python:3.9
 WORKDIR /app
 
 # Copy requirements file
-COPY requirements.txt .
+#COPY requirements.txt .
+COPY . .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the Flask application files to the container
-COPY app.py .
-COPY templates templates
+#COPY app.py .
+#COPY templates templates
 
 # Expose port 80
 EXPOSE 80

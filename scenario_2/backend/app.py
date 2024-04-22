@@ -1,27 +1,39 @@
+# flask app with persistence and logging
+
 from flask import Flask, request, jsonify
 import sqlite3
 import os
-
+import logging
 
 app = Flask(__name__)
+port = 5100
 
+# vars
+logging_dir = 'logs'
+data_dir = 'data'
 
-port=5100
+if not os.path.exists(logging_dir):
+    os.makedirs(logging_dir)
 
+logging.basicConfig(
+    filename=os.path.join(logging_dir, 'app.log'),
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s:%(message)s'
+)
 
 # Function to create a connection to SQLite database
 def create_connection():
     conn = None
     
     # Create 'data' directory if not exists
-    if not os.path.exists('data'):
-        os.makedirs('data')
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
     
     try:
-        conn = sqlite3.connect('./data/data.db')
-        print("Connection to SQLite DB successful")
+        conn = sqlite3.connect(f'./{data_dir}/data.db')
+        logging.info("Connection to SQLite DB successful")
     except sqlite3.Error as e:
-        print(f"Error connecting to SQLite DB: {e}")
+        logging.error(f"Error connecting to SQLite DB: {e}")
     return conn
 
 # Function to create a table if it doesn't exist
@@ -35,16 +47,14 @@ def create_table(conn):
                 content TEXT
             )
         ''')
-        print("Table created successfully")
+        logging.info("Table created successfully")
     except sqlite3.Error as e:
-        print(f"Error creating table: {e}")
-
-
+        logging.error(f"Error creating table: {e}")
 
 # API endpoint to handle GET requests
-# curl -X GET http://localhost:5100/posts
 @app.route('/posts', methods=['GET'])
 def get_posts():
+    logging.info("Received GET request for /posts")
     try:
         conn = create_connection()
         cursor = conn.cursor()
@@ -55,22 +65,13 @@ def get_posts():
 
         return jsonify({"posts": posts}), 200
     except Exception as e:
+        logging.error(f"GET /posts failed: {e}")
         return jsonify({"error": str(e)}), 500
 
-
-
-
-
-# curl -X POST \
-#   http://localhost:5000/posts \
-#   -H 'Content-Type: application/json' \
-#   -d '{
-#     "title": "Example Title",
-#     "content": "This is an example content for the post."
-# }'
 # API endpoint to handle POST requests
 @app.route('/posts', methods=['POST'])
 def create_post():
+    logging.info("Received POST request for /posts")
     try:
         conn = create_connection()
         create_table(conn)
@@ -84,9 +85,10 @@ def create_post():
         # Insert data into the database
         cursor.execute("INSERT INTO posts (title, content) VALUES (?, ?)", (title, content))
         conn.commit()
-        conn.close()
+        logging.info("Post created successfully")
         return jsonify({"message": "Post created successfully"}), 201
     except Exception as e:
+        logging.error(f"POST /posts failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

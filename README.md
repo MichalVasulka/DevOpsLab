@@ -183,20 +183,23 @@ curl http://localhost:8000/
 
 ## scenario_1
 
-Basic flask app
+Basic flask app that is functional, but has numerous build and security related issues.
 
-build images locally
+Build images locally
 
 ```bash
 docker-compose build
 docker-compose up # performs build if needed
 
-# direct builds
+# direct builds in respective directories
+cd backend
 docker build -t backend-img .
+
+cd frontend
 docker build -t frontend-img .
 ```
 
-start frontend and backend containers directly
+start frontend and backend containers directly, no need to `cd` to respective dirs once images are built
 
 ```bash
 docker run -it --rm --name backend -p 5100:5100 backend-img
@@ -205,10 +208,7 @@ docker run -it --rm --add-host=host.docker.internal:host-gateway -e ENV=prod --n
 docker run -d <other params>
 ```
 
-check functionality with browser on http://localhost:8080
-
-check data persistence after docker just killing docker-compose,compose down, docker system prune 
-
+Check functionality with browser on http://localhost:8080
 
 verify env var is present within container
 ```docker exec -it frontend bash -c 'echo "$ENV"'```
@@ -216,10 +216,63 @@ verify env var is present within container
 we can also use ./env file via --env-file directive (so secrets are not in shell history)
 
 
+Check data persistence after just killing docker-compose, `docker-compose down`, `docker system prune`. And then starting the containers back up. 
+
+
+
+
 ## scenario_2
 
-Enhanced flask app with persistence and best practices. Plus some basic security considerations.
+Enhanced flask app with data persistence and best practices (better practices).
 Dir mounts and logging to VM file. Optimized layer build sequence.
+Specific library version numbers in `requirements.txt`.
+
+
+Build images locally
+
+```bash
+docker-compose build
+docker-compose up # performs build if needed
+
+# direct builds in respective directories
+cd backend
+docker build -t backend-img:v2 .
+
+cd frontend
+docker build -t frontend-img:v2 .
+```
+
+Start frontend and backend containers directly, no need to `cd` to respective dirs once images are built
+
+```bash
+mkdir -p /home/$USER/data
+mkdir -p /home/$USER/logs
+
+docker run -it --rm --name backend -p 5100:5100 \
+  -v /home/$USER/data:/app/data \
+  -v /home/$USER/logs:/app/logs \
+  backend-img:v2
+
+
+
+docker run -it --rm --add-host=host.docker.internal:host-gateway -e ENV=prod \
+-v /home/$USER/logs:/app/logs \
+--name frontend \
+-p 8080:8080 \
+frontend-img:v2
+
+
+
+# daemonized example
+docker run -d <other params>
+```
+
+
+
+
+
+
+
 
 
 
