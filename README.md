@@ -155,6 +155,14 @@ backend:  python3 app.py
 backend is writing data to sqlite database "locally". 
 Term "local" can have different meanings in context of containerised apps. 
 
+## Note
+Regarding Docker Compose commands.
+if 
+```docker-compose up``` 
+doesn't work, then use command without dash
+```docker compose up```
+
+
 ## scenario_0
 
 super simple flask app
@@ -657,8 +665,9 @@ So basically, app architecture should be the same with and without containers. Y
 
 
 
-# Other useful Docker commands
+## Other useful Docker commands
 
+```bash
 docker ps -a  # list all containers (even stopped and paused ones)
 docker pause mycontainer   # pauses container
 docker unpause mycontainer # unpauses container
@@ -668,11 +677,12 @@ docker start mycontainer # starts contaner
 docker stop -t 10 mycontainer # stops gracefully (SIGTERM), force stop later if need be (SIGKILL)
 docker kill mycontainer # force stop container
 docker logs mycontainer # shows logging for containers
-
+```
 
 ## Image and Docker hub related commands
 
-docker login
+```bash
+docker login -u <dockerhub_account>
 docker image ls  # (docker images)
 # create your Dockerfile and then in the same directory run:
 docker image build --tag dockerhubuser/myimage:v0.1
@@ -684,34 +694,35 @@ docker push dockerhubuser/myimage:v0.1
 # pull our image from registry if needed
 docker pull dockerhubuser/myimage:v0.1
 
-
 #remove the image locally
 docker image rmi dockerhubuser/myimage:v0.1
 # alternatively
 docker rmi dockerhubuser/myimage:v0.1
-
+```
 
 ## Docker volumes for persistence
 3 types: host, anonymous and named volumes (use named volumes for production ideally)
 
 host volumes (-v hostVM:container)
-docker run -v /home/mount/data:/var/lib/mysql/data --name <container> <image>
+```docker run -v /home/mount/data:/var/lib/mysql/data --name <container> <image>```
 
 Anonymous Volumes (-v /container/dir)
-docker run -v /var/lib/mysql/data --name <container> <image>
-some random hash volume will be created under /var/lib/docker/volumes/ directory on host VM
+```docker run -v /var/lib/mysql/data --name <container> <image>```
+some random hash volume will be created under ```/var/lib/docker/volumes/``` directory on host VM
 
-Named volumes (-v name:/container/dir) 
+Named volumes (```-v name:/container/dir```) 
 need to create docker volume first
+
+```bash
 docker volume create volume_1
 docker volume ls
 docker volume inspect volume_1
 docker run -v <vol_name>:/var/lib/mysql/data --name <container> <image>
 docker volume rm volume_1 # remove volume when not needed
 docker volume ls
+```
 
-Named volumes go well with docker-compose files, easy to define shared dir for containers (for example for logging)
-
+Named volumes work well with docker-compose files, easy to define shared dir for containers (for example for logging)
 
 
 
