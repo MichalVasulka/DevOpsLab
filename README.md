@@ -313,7 +313,7 @@ docker run -it --rm --name secure_v1 -p 8000:8000 secure-img:v1
 
 Try to get into the container and switch to root user.
 ```bash
-docker exec -it --rm secure_v1 /bin/bash
+docker exec -it secure_v1 /bin/bash
 
 ```
 

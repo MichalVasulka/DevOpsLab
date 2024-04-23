@@ -3,7 +3,8 @@ version: '3.8'
 services:
   backend:
     container_name: backend_v2
-    image: backend-img:v2  # Specify the image version used
+    image: backend-img:v2
+    build: ./backend
     ports:
       - "5100:5100"
     volumes:
@@ -13,7 +14,8 @@ services:
 
   frontend:
     container_name: frontend_v2
-    image: frontend-img:v2  # Specify the image version used
+    image: frontend-img:v2
+    build: ./frontend
     ports:
       - "8080:8080"
     depends_on:
