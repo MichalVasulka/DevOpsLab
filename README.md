@@ -3,12 +3,15 @@
 Training repo for Docker, Docker Swarm, Kubernetes and other DevOps related technologies and topics.
 Currently only Docker part present, other topics in active development.
 
-# Docker basics
+## Docker basics
 
+Docker is a platform that uses containers to package and run applications with all their dependencies, making them portable and consistent across different environments. Unlike virtual machines (VMs) that virtualize entire operating systems, Docker containers share the host OS kernel, making them more lightweight and resource-efficient. While Docker provides efficient and faster deployment, VMs offer stronger isolation by running separate OS instances.
+
+TODO:
 Add diagrams with Docker and VM comparison. Difference between image and container.
 
 
-# Useful resources:
+## Useful Docker resources:
 
 - 100+ Docker Concepts in 10 minutes
   https://www.youtube.com/watch?v=rIrNIzy6U_g
@@ -16,26 +19,6 @@ Add diagrams with Docker and VM comparison. Difference between image and contain
   https://www.youtube.com/watch?v=pg19Z8LL06w
 - Docker in 3 hours
   https://www.youtube.com/watch?v=3c-iBn73dDE
-
-
-# Useful docker notes
-
-do not use ```docker attach``` command, once you get out of it, it will close the main container shell that runs your app, effectively ending container functionality, can cause outage
-
-```docker exec mycontainer ls /```
-is better command (we send the command remotely from host VM)
-
-best trick
-```docker exec -it mycontainer /bin/bash```   this leaves your main shell intact when I exit, so does not cause an outage
-
-you can build docker images from Docker file, but also from well working tweaked containers
-that is great trick, but this is not recommended
-it is better to fix the Dockerfile itself
-
-images are static, read only
-
-containers have option for read write access to the volume system
-
 
 
 
@@ -51,17 +34,17 @@ Docker and containers in general offer following benefits:
 - deployment consistency (we start from clean images, image structure fully under developer control)
 - granularity of microservices (app modules are typically not that complex as monolithical app)
 - self healing, liveness probes
-- partial degradation (app works in general, just payment gateway microservice went down)
+- partial service degradation (app works in general, just payment gateway microservice went down)
 - target VM retains old app images - super easy rollback in cse of outage, we just spin up old good container
 - ability to limit resource usage for each container
-- easy automated app deployments
+- (easier) automated app deployments
 - allows for fast app lifecycle iteration
 - goes well with CI/CD build pipelines
 - scaling - Docker Swarm, Kubernetes
 - easy and quick rollback to older well functioning containers/images (including artefacts)
 - docker containers are relatively easy to build and run (this changes with kubernetes though)
 - provides level of abstraction - when expanding app functionality, we can create just new microservice -> thinking on API/microservice level
-- allows for easy combination of different technologies (app can have both express and flask backends, can use multiple separate DBs - Postreg + Mongo). If having multiple technologies within one project is good idea, that is another question.
+- allows for easy combination of different technologies (app can have both express and flask backends, can use multiple separate DBs - Postgres, Mongo). If having multiple technologies within one project is good idea, that is another question.
 - app in container thinks it is running in regular VM (not entirely true, there are some docker specific directives app can call, such as ```host.docker.internal``` directive and Docker DNS), we can let app know it runs in container by injecting env variables
 - static security scanning of each image (easy to see vulnerabilities of you app in given build), we can see security vulnerabilities per image layer
 - app can be built by parts as Lego
@@ -78,13 +61,13 @@ Disadvantages:
 
 Interesting topics not covered (yet):
 
-- multi-stage builds
+- multi-stage builds (to save disk space)
 - container DNS
 - advanced Docker networking
 - SELinux, AppArmor (just basics covered)
 
 
-
+### Lab prerequisites
 
 Ubuntu 22.04 prerequisites:
 
@@ -106,6 +89,26 @@ And install pip so we can develop python apps locally before putting them into c
 sudo apt install python3-pip
 ```
 
+
+## Useful docker notes
+
+Do not use ```docker attach``` command, once you get out of it, it will close the main container shell that runs your app, effectively ending container functionality, can cause outage
+
+```docker exec mycontainer ls /```
+is better command (we send the command remotely from host VM)
+
+best trick
+```docker exec -it mycontainer /bin/bash```   this leaves your main shell intact upon exit, so does not cause an outage on running container
+
+you can build docker images from Docker file, but also from well working tweaked containers
+that is great trick, but this is not recommended in general
+it is better to fix the Dockerfile itself
+
+images are static, read only
+
+containers have option for read write access to the volume system
+
+
 ## Docker cheatsheets
 - https://quickref.me/docker.html
 - https://github.com/wsargent/docker-cheat-sheet?tab=readme-ov-file
@@ -115,8 +118,8 @@ sudo apt install python3-pip
 - https://github.com/dnaprawa/dockerfile-best-practices
 - https://www.youtube.com/watch?v=8vXoMqWgbQQ
 
-best practices summary:
-- use official and verified docker image (official node, python)
+Best practices summary:
+- use official and verified docker image (official nodejs, python)
 - do not use 'latest' tag, use specific tags (both for pull and for image creation)
 - prefer smaller base images (eg. Alpine Linux, smaller attack surface), even official app images use various OSes as base, like node:17.0.1-alpine
 - optimize caching Image Layers in Dockerfile (see with ```docker history myapp:1.0```), sequence of build commands is important (cache invaidation for higher levels), least changed data -> most frequently changed data
@@ -129,7 +132,7 @@ best practices summary:
 # Docker lab section
 
 Topics covered:
-basic Docker setup, data persistence, logging, resource allocation, best practices, security.
+basic Docker setup, data persistence, logging, resource allocation, best practices, security, healthcheck probes.
 
 
 
@@ -165,26 +168,27 @@ doesn't work, then use command without dash
 
 ## scenario_0
 
-super simple flask app
+Super simple flask app
 
-build image locally (from scenario dir)
+Build image locally (from scenario dir)
 
 ```bash
+cd scenario_0
 docker build -t myimage .
 ```
 
-start container
+Start container interactively
 
 ```bash
 docker run -it --rm --name simple-app -p 8000:8000 myimage
 ```
 
-handle with docker compose
+Alternatively handle with docker compose
 ```bash
 docker-compose up
 ```
 
-check with curl
+Check with curl
 ```bash
 curl http://localhost:8000/
 ```
@@ -196,6 +200,8 @@ Basic flask app that is functional, but has numerous build and security related 
 Build images locally
 
 ```bash
+cd scenario_1
+
 docker-compose build
 docker-compose up # performs build if needed
 
@@ -231,7 +237,7 @@ Check data persistence after just killing docker-compose, `docker-compose down`,
 
 ## scenario_2
 
-Enhanced flask app with data persistence and best practices (better practices).
+Enhanced flask app with data persistence and "best practices" (better practices).
 Dir mounts and logging to VM file. Optimized layer build sequence.
 Specific library version numbers in `requirements.txt`.
 
@@ -239,6 +245,8 @@ Specific library version numbers in `requirements.txt`.
 Build images locally
 
 ```bash
+cd scenario_2
+
 docker-compose build
 docker-compose up # performs build if needed
 
@@ -276,11 +284,7 @@ frontend-img:v2
 docker run -d <other params>
 ```
 
-
-
-
-
-## Backend
+We can test our backend API with `curl` if needed.
 
 ```bash
 curl -X POST \
@@ -290,26 +294,13 @@ curl -X POST \
     "title": "Example Title",
     "content": "This is an example content for the post."
 }'
-
-docker build -t flask-backend .
-
-docker run -d -p 5000:5000 flask-backend
 ```
 
-## Frontend
-
-```bash
-docker build -t flask-frontend .
-docker run -d -p 80:80 flask-frontend
-
-```
 
 ## Security template
 
 Quick build of hardened image/container with simple flask app using basic security measures.
 
-
-### Part 1
 
 ```bash
 cd security-template
@@ -381,7 +372,7 @@ root@197c6180089c:/app#
 
 Limiting container resource usage
 
-simple stress test Dockerfile:
+Simple stress test Dockerfile:
 ```docker
 FROM ubuntu
 RUN apt-get update && apt-get install stress
@@ -413,7 +404,7 @@ docker run --cpushares 256 <docker-image>    # by default 1024 cpushares, if onl
 docker run --memory 512MB --memory-swap 1024MB <docker-image>  # swap number has to be higher than memory, otherwise no swap gets allocated
 ```
 
-memory limits are best combined with liveness probes, so container does not get stuck with out of memory condition
+Memory limits are best combined with liveness probes, so container does not get stuck with out of memory condition
 
 
 
@@ -435,10 +426,9 @@ Docker can also limit container I/O disk operations.
 
 
 
-
 ## Docker networking
 
-when using host.docker.internal trick, you might encounter issues communicating between containers.
+When using `host.docker.internal` trick, you might encounter issues communicating between containers.
 Eg. one backend container having issues contacting second backend container running on different port in different container.
 
 How to t-shoot:
@@ -469,54 +459,46 @@ sudo ufw status
 
 ## What is 'localhost' ?
 
-When dealing with containers, we need to be careful about what we mean by localhost.
+While dealing with containers, we need to be careful about what we mean by `localhost`.
 When running the app on host VM, the localhost is the VM itself. Such app can reach other apps running on different ports without issues.
 
-When running app within container, the localhost is the container itself. It will not be able (by default) to reach other apps with calls like ```curl http://localhost:5000/api/healthcheck```.
+But in case we are running app within container, the localhost is the container itself. It will not be able (by default) to reach other apps with calls like ```curl http://localhost:5000/api/healthcheck```.
 
 Caveat:
-When using web frameworks that distinguish server-side and client-side rendering, we need to be extra careful. Localhost for server-side rendering is the VM/container app runs on. Localhost on client-side rendered code is the machine of end user (laptop/tablet/smartphone). This is common cause for errors when calling backend api endpoints from frontend.
-
-
+While using web frameworks that distinguish server-side and client-side rendering, we need to be extra careful. Localhost for server-side rendering is the VM/container app runs on. Localhost on client-side rendered code is the machine of end user (laptop/tablet/smartphone). This is common cause for errors when calling backend api endpoints from frontend.
 
 
 
 ## General Docker notes
 
 ```bash
-docker run -p 80:80 myimage     # port linking
-docker run -it -p 80:80 myimage   # runs interactively (we can see logs rolling)
-docker run -d -p 80:80 myimage   # spins up container in background
-docker run -d --name mycontainer -p 80:80 myimage   # assign custom name to container
-
+docker run -p 80:80 <myimage>     # port linking
+docker run -it -p 80:80 <myimage>   # runs interactively (we can see logs rolling)
+docker run -d -p 80:80 <myimage>   # spins up container in background
+docker run -d --name <mycontainer> -p 80:80 <myimage>   # assign custom name to container
 
 docker ps   # shows running containers
 docker ps -a  # shows all containers
 
-docker stop mycontainer
-docker kill mycontainer
+docker stop <mycontainer>
+docker kill <mycontainer>
 
-
-
-docker inspect mycontainer # shows detailed info about container (running/stopped)
-
+docker inspect <mycontainer> # shows detailed info about container (running/stopped)
 
 docker stats   # resource usage for all cotainers
-docker top mycontainer  # show running processes inside container
+docker top <mycontainer>  # show running processes inside container
 
 docker network ls # shows docker networks
 
-
-docker logging:
-docker logs -f mycontainer   # equivalent of tail -f on the container logs
+# docker logging:
+docker logs -f <mycontainer>   # equivalent of tail -f on the container logs
 ```
 
-troubleshooting commands
+Troubleshooting commands
 ```bash
-docker attach mycontainer # do not use, will likely cause container outage, takes over main shell that runs the actual app
-docker exec mycontainer whoami  # execute command within container
-docker exec -it mycontainer /bin/bash    # favourite t-shooting command
-
+docker attach <mycontainer> # do not use, will likely cause container outage, takes over main shell that runs the actual app
+docker exec <mycontainer> whoami  # execute command within container
+docker exec -it <mycontainer> /bin/bash    # favourite t-shooting command
 
 docker images
 docker rmi <image_name>
@@ -534,9 +516,9 @@ Docker daemon is just a process running inside VM and Docker is managed by VM ke
 Docker daemon typically runs under root user (from VM perspective) and users that have access to Docker daemon are typically members of ```docker``` group. Making them essentially system admins -> access to ```docker``` group needs to be limited. From security standpoint, do not treat containers as micro-VMs.
 
 Docker engine generates several linux namespaces, such as: process ID (PID), mount (MNT), networking (NET), USER namespace, ...
-linux namespaces are meant for isolation purposes
+Linux namespaces are meant for isolation purposes.
 
-Best security docker practices:
+"Best" security docker practices:
 
 - keep docker engine patched regularly
 - securing docker socket (```/var/run/docker.sock```) only accessible by root and users in ```docker``` group (sysadmins, not devs)
@@ -546,18 +528,18 @@ Best security docker practices:
 - set nologin for root user in container
 - download only official images from container repos (such as DockerHub)
 - start docker container with ```no-new-privileges``` to avoid rights escalation
-- mount files to container in read only where feasible (--mount source=...,readonly)
+- mount files to container in read only where feasible (`--mount source=<...>,readonly`)
 - run whole container in read only where feasible ```docker run --read-only <myimage> sh -c 'echo "Testing" > /tmp/test'```
 - do not include passwords, API keys, RSA keys into Dockerfile/image
-- read a book on Docker security
-- ```COPY . .``` command is recursive, you can unknowingly copy sensitive data to image, make sure you use .dockerignore file to limit what we copy to image
+- read a book on Docker security `:)`
+- ```COPY . .``` command is recursive, you can unknowingly copy sensitive data to image, make sure you use `.dockerignore` file to limit what we copy to image
 - limit available resources for containers - CPU, RAM, Disk I/O, helps mitigate Denial of service attack impact on given microservice.
 - drop container capabilities (```docker run -d -it --cap-drop=chown <myimage>```)
 - handling secrets - familiarize yourself with ```docker secret``` command
 - use docker image tags consistently (```1.1.2-prod```, ```1.1.2-dev```, ```LABEL "version"="1.1.2-dev"``` directive in Dockerfile, can be seen with ```docker inspect <myimage>``` command)
 
 
-```bash
+```docker
 FROM alpine
 
 RUN addgroup -S secureusers && adduser -S secureuser -G secureusers
@@ -597,7 +579,8 @@ sudo apt install apparmor-profiles
 from docker docs:
 https://docs.docker.com/engine/security/apparmor/
 
-AppArmor security profiles for Docker
+AppArmor security profiles for Docker:
+
 AppArmor (Application Armor) is a Linux security module that protects an operating system and its applications from security threats. To use it, a system administrator associates an AppArmor security profile with each program. Docker expects to find an AppArmor policy loaded and enforced.
 
 Docker automatically generates and loads a default profile for containers named docker-default. The Docker binary generates this profile in tmpfs and then loads it into the kernel.
@@ -667,7 +650,7 @@ Useful AppArmor links:
 
 ## Image Security Scanning
 
-login to your DockerHub account, use your access token.
+Login to your DockerHub account, use your access token.
 
 Our example image with security scan:
 https://hub.docker.com/repository/docker/swilab/backend-img/general
@@ -703,7 +686,6 @@ To restart docker container regularly we can use cron.
 For example more complex streamlit python apps benefit from restarting from time to time.
 
 
-
 Cron Jobs (for Linux users): You can use a cron job to schedule a weekly restart of your Docker container. Open your crontab file with the command crontab -e and add a line like this:
 
 ```bash
@@ -720,20 +702,21 @@ Requires container with static name.
 
 Personal observation when developing on Docker. 
 
-Port mapping 
-we can run app on its default port in container and expose it on VM on different port.
+Port mapping:
+
+We can run app on its default port in container and expose it on VM on different port.
 So for example flask runs by default on port 5000, so the mapping would be ```-p 5001:5000```.
 
 But since building Docker images takes time, it would delay us in the development.
 Especially React/NextJS frontend image builds are heavy on resources, especially when we use Linux running in Virtual box as dev machine. You will see lots of Disk IO wait times and system interrupts during builds.
 
 
-So turns out it is convenient to have apps running locally during dev on the same port that container would be using. On main dev VM there would also be NGINX reverse proxy aware of the app/container ports.
+So, turns out it is convenient to have apps running locally during dev on the same port that container would be using. On main dev VM, there would also be NGINX reverse proxy aware of the app/container ports.
 
-so lets say we have frontend on port 3000, flask backend on 5000 and express backend on 5000
+Lets say we have frontend on port 3000, flask backend on 5000 and express backend on 5000
 
-then we would remap the apps themselves to ports corresponding to final container setup and let revese proxy to be aware of the port architecture
-so it would be 3000, 5100 and 5200. This way we can run dev tests easily without containers and we save lots of time.
+Then we would remap the apps themselves to ports corresponding to final container setup and let revese proxy to be aware of the port architecture.
+So it would be 3000, 5100 and 5200. This way we can run dev tests easily without containers and we save lots of time.
 
 So basically, app architecture should be the same with and without containers. You can let app know it runs within container with injected env vars.
 
@@ -742,15 +725,15 @@ So basically, app architecture should be the same with and without containers. Y
 ## Other useful Docker commands
 
 ```bash
-docker ps -a  # list all containers (even stopped and paused ones)
-docker pause mycontainer      # pauses container
-docker unpause mycontainer    # unpauses container
-docker restart mycontainer    # restarts container
-docker stop mycontainer       # stops container
-docker start mycontainer      # starts contaner
-docker stop -t 10 mycontainer # stops gracefully (SIGTERM), force stop later if need be (SIGKILL)
-docker kill mycontainer       # force stop container
-docker logs mycontainer       # shows logging for containers
+docker ps -a                    # list all containers (even stopped and paused ones)
+docker pause <mycontainer>      # pauses container
+docker unpause <mycontainer>    # unpauses container
+docker restart <mycontainer>    # restarts container
+docker stop <mycontainer>       # stops container
+docker start <mycontainer>      # starts contaner
+docker stop -t 10 <mycontainer> # stops gracefully (SIGTERM), force stop later if need be (SIGKILL)
+docker kill <mycontainer>       # force stop container
+docker logs <mycontainer>       # shows logging for containers
 ```
 
 ## Image and Docker hub related commands
@@ -763,28 +746,29 @@ docker image build --tag dockerhubuser/myimage:v0.1
 # alternatively
 docker build -t myimage:v0.1
 # then push to DockerHub repo if needed
-docker push dockerhubuser/myimage:v0.1
+docker push <dockerhubuser>/myimage:v0.1
 
 # pull our image from registry if needed
-docker pull dockerhubuser/myimage:v0.1
+docker pull <dockerhubuser>/myimage:v0.1
 
 #remove the image locally
-docker image rmi dockerhubuser/myimage:v0.1
+docker image rmi <dockerhubuser>/myimage:v0.1
 # alternatively
-docker rmi dockerhubuser/myimage:v0.1
+docker rmi <dockerhubuser>/myimage:v0.1
 ```
 
 ## Docker volumes for persistence
-3 types: host, anonymous and named volumes (use named volumes for production ideally)
+3 types: `host`, `anonymous` and `named volumes` (use named volumes for production ideally)
 
-host volumes (-v hostVM:container)
+#### Host volumes (`-v hostVM:<container>`)
+
 ```docker run -v /home/mount/data:/var/lib/mysql/data --name <container> <image>```
 
-Anonymous Volumes (-v /container/dir)
+#### Anonymous Volumes (`-v </container/dir>`)
 ```docker run -v /var/lib/mysql/data --name <container> <image>```
 some random hash volume will be created under ```/var/lib/docker/volumes/``` directory on host VM
 
-Named volumes (```-v name:/container/dir```) 
+#### Named volumes (```-v <name>:</container/dir>```) 
 need to create docker volume first
 
 ```bash
@@ -800,7 +784,7 @@ Named volumes work well with docker-compose files, easy to define shared dir for
 
 
 
-# Kubernetes (general notes)
+# Kubernetes (general notes) - DRAFT
 
 kubernetes is state machine
 
