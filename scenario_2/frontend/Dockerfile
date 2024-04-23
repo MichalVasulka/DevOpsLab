@@ -11,8 +11,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the Flask application files to the container
-COPY app.py .
+# expecting templates to have slower layer lifecycle
 COPY templates templates
+COPY app.py .
+
 
 # Expose port 80
 EXPOSE 80
