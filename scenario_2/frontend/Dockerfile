@@ -1,5 +1,13 @@
-# Use Python 3.9 image as the base
-FROM python:3.9
+# Use Python image as the base
+FROM python:3.8-slim-buster
+
+# Metadata as defined at http://label-schema.org
+LABEL maintainer="your-email@example.com" \
+      version="2.0" \
+      description="This is a Flask application running on Docker."
+
+
+
 
 # Set working directory
 WORKDIR /app
@@ -16,8 +24,11 @@ COPY templates templates
 COPY app.py .
 
 
-# Expose port 80
-EXPOSE 80
+# Expose port 8080
+EXPOSE 8080
+
+# Healthcheck with retries and grace period
+HEALTHCHECK --start-period=10s --retries=3 CMD curl --fail http://localhost:8080/health || exit 1
 
 # Command to run the Flask application
 CMD ["python", "app.py"]

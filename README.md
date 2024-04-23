@@ -81,7 +81,7 @@ Interesting topics not covered (yet):
 - multi-stage builds
 - container DNS
 - advanced Docker networking
-- SELinux, AppArmor
+- SELinux, AppArmor (just basics covered)
 
 
 
@@ -176,7 +176,7 @@ docker build -t myimage .
 start container
 
 ```bash
-docker run -it --name simple-app -p 8000:8000 myimage
+docker run -it --rm --name simple-app -p 8000:8000 myimage
 ```
 
 handle with docker compose
@@ -256,29 +256,25 @@ Start frontend and backend containers directly, no need to `cd` to respective di
 mkdir -p /home/$USER/data
 mkdir -p /home/$USER/logs
 
-docker run -it --rm --name backend -p 5100:5100 \
+# backend
+docker run -it --rm --name backend_v2 -p 5100:5100 \
   -v /home/$USER/data:/app/data \
   -v /home/$USER/logs:/app/logs \
   backend-img:v2
 
 
-
+# frontend
 docker run -it --rm --add-host=host.docker.internal:host-gateway -e ENV=prod \
 -v /home/$USER/logs:/app/logs \
---name frontend \
+--name frontend_v2 \
 -p 8080:8080 \
 frontend-img:v2
 
 
 
-# daemonized example
+# daemonized example (-d instead of -it)
 docker run -d <other params>
 ```
-
-
-
-
-
 
 
 
@@ -307,6 +303,137 @@ docker build -t flask-frontend .
 docker run -d -p 80:80 flask-frontend
 
 ```
+
+## Security template
+
+Quick build of hardened image/container with simple flask app using basic security measures.
+
+
+### Part 1
+
+```bash
+cd security-template
+
+docker build -t secure-img:v1 .
+
+docker run -it --rm --name secure_v1 -p 8000:8000 secure-img:v1
+
+```
+
+Try to get into the container and switch to root user.
+```bash
+docker exec -it --rm secure_v1 /bin/bash
+
+```
+
+Now we have issues getting to root shell and by default we get to default nonprivileged user shell.
+Without root shell removal, we would be able to switch to root without password. 
+Attacker cannot install any other tools with apt/pip.
+This will cause issues though if we need to troubleshoot directly within our container since our privileges will be limited.
+
+```bash
+coil@devVM:~/Desktop/DevOpsLab/security-template$ curl http://localhost:8000
+Hello, Docker!
+coil@devVM:~/Desktop/DevOpsLab/security-template$ docker exec -it security_v1 /bin/bash
+appuser@452535828ff4:/app$ ls
+Dockerfile  __pycache__  app.py  requirements.txt
+appuser@452535828ff4:/app$ su
+Password: 
+su: Authentication failure
+appuser@452535828ff4:/app$ sudo su -
+bash: sudo: command not found
+appuser@452535828ff4:/app$ su -
+Password: 
+su: Authentication failure
+appuser@452535828ff4:/app$ apt-get install curl
+E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), are you root?
+appuser@452535828ff4:/app$
+appuser@452535828ff4:/app$ pip install requests
+WARNING: The directory '/home/appuser/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you should use sudo's -H flag.
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: requests in /usr/local/lib/python3.8/site-packages (2.25.1)
+Requirement already satisfied: chardet<5,>=3.0.2 in /usr/local/lib/python3.8/site-packages (from requests) (4.0.0)
+Requirement already satisfied: idna<3,>=2.5 in /usr/local/lib/python3.8/site-packages (from requests) (2.10)
+Requirement already satisfied: urllib3<1.27,>=1.21.1 in /usr/local/lib/python3.8/site-packages (from requests) (1.26.18)
+Requirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.8/site-packages (from requests) (2024.2.2)
+ERROR: Could not install packages due to an OSError: [Errno 13] Permission denied: '/home/appuser'
+Check the permissions.
+
+appuser@452535828ff4:/app$ 
+```
+
+We can still get access to container root user from host VM.
+
+Note: it is unclear why root now has shell when we specified /sbin/nologin, this will need further investigation. Possibly managed by Docker daemon.
+
+```bash
+root@ae32643496be:/etc# coil@devVM:~/Desktop/DevOpsLab/security-template$ docker exec -it -u root secure_v1 /bin/bash
+root@197c6180089c:/app# whoami
+root
+root@197c6180089c:/app# ls
+Dockerfile  __pycache__  app.py  requirements.txt
+root@197c6180089c:/app# 
+```
+
+
+## Stress test
+
+Limiting container resource usage
+
+simple stress test Dockerfile:
+```docker
+FROM ubuntu
+RUN apt-get update && apt-get install stress
+CMD stress $var
+```
+
+```bash
+docker build -t docker-stress .
+
+#remove all other containers
+docker rm -f $(docker -a -q)
+
+#container is very resource hungry
+docker run --rm -it -e var="--cpu 6 --timeout 40" docker-stress   # test runs for 40 seconds
+docker stats
+
+#we limit resource hungry container on docker level
+docker run --rm -it -e var="--cpu 6 --timeout 40" --cpus 1 --name docker-stress-cont docker-stress
+docker stats
+```
+
+
+```bash
+docker stats <somecontainer>
+
+docker run --cpus 2 <docker-image>
+docker run --cpushares 256 <docker-image>    # by default 1024 cpushares, if only 1 container running, Docker will give it all cpushares even if limited by parameter, so Docker makes override
+
+docker run --memory 512MB --memory-swap 1024MB <docker-image>  # swap number has to be higher than memory, otherwise no swap gets allocated
+```
+
+memory limits are best combined with liveness probes, so container does not get stuck with out of memory condition
+
+
+
+Memory limitation
+
+```bash
+docker run --rm -it -e var="--vm 2 --vm-bytes 128MB --timeout 40" --name docker-stress-cont docker-stress 
+docker stats
+
+
+docker run --rm -it -e var="--vm 2 --vm-bytes 128MB --timeout 40" --memory 512 --name docker-stress-cont docker-stress 
+docker stats
+```
+
+Docker can also limit container I/O disk operations.
+
+
+
+
+
 
 
 ## Docker networking
@@ -398,59 +525,6 @@ docker system prune # removed hanging images and residual stopped containers (ca
 ```
 
 
-## Stress test
-
-Limiting container resource usage
-
-simple stress test Dockerfile:
-```docker
-FROM ubuntu
-RUN apt-get update && apt-get install stress
-CMD stress $var
-```
-
-```bash
-docker build -t docker-stress .
-
-remove all other containers
-docker rm -f $(docker -a -q)
-
-container is very resource hungry
-docker run --rm -it -e var="--cpu 6 --timeout 40" docker-stress   # test runs for 40 seconds
-docker stats
-
-we limit hungry container on docker level
-docker run --rm -it -e var="--cpu 6 --timeout 40" --cpus 1 --name docker-stress-cont docker-stress
-docker stats
-```
-
-
-```bash
-docker stats someimage
-
-docker run --cpus 2 <docker-image>
-docker run --cpushares 256 <docker-image>    # by default 1024 cpushares, if only 1 container running, Docker will give it all cpushares even if limited by parameter, so Docker makes override
-
-docker run --memory 512MB --memory-swap 1024MB <docker-image>  # swap number has to be higher than memory, otherwise no swap gets allocated
-```
-
-memory limits are best combined with liveness probes, so container does not get stuck with out of memory condition
-
-
-
-Memory limitation
-
-```docker
-docker run --rm -it -e var="--vm 2 --vm-bytes 128MB --timeout 40" --name docker-stress-cont docker-stress 
-docker stats
-
-
-docker run --rm -it -e var="--vm 2 --vm-bytes 128MB --timeout 40" --memory 512 --name docker-stress-cont docker-stress 
-docker stats
-```
-
-docker can also limit container I/O disk operations
-
 
 
 # Docker security
@@ -483,7 +557,7 @@ Best security docker practices:
 - use docker image tags consistently (```1.1.2-prod```, ```1.1.2-dev```, ```LABEL "version"="1.1.2-dev"``` directive in Dockerfile, can be seen with ```docker inspect <myimage>``` command)
 
 
-```docker
+```bash
 FROM alpine
 
 RUN addgroup -S secureusers && adduser -S secureuser -G secureusers
@@ -669,14 +743,14 @@ So basically, app architecture should be the same with and without containers. Y
 
 ```bash
 docker ps -a  # list all containers (even stopped and paused ones)
-docker pause mycontainer   # pauses container
-docker unpause mycontainer # unpauses container
-docker restart mycontainer # restarts container
-docker stop mycontainer # stops container
-docker start mycontainer # starts contaner
+docker pause mycontainer      # pauses container
+docker unpause mycontainer    # unpauses container
+docker restart mycontainer    # restarts container
+docker stop mycontainer       # stops container
+docker start mycontainer      # starts contaner
 docker stop -t 10 mycontainer # stops gracefully (SIGTERM), force stop later if need be (SIGKILL)
-docker kill mycontainer # force stop container
-docker logs mycontainer # shows logging for containers
+docker kill mycontainer       # force stop container
+docker logs mycontainer       # shows logging for containers
 ```
 
 ## Image and Docker hub related commands

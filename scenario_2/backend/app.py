@@ -51,6 +51,13 @@ def create_table(conn):
     except sqlite3.Error as e:
         logging.error(f"Error creating table: {e}")
 
+# --- API Endpoints ---
+
+@app.route('/health', methods=['GET'])
+def health():
+    # Return HTTP 200 OK status and a JSON payload
+    return jsonify({'status': 'OK'}), 200
+
 # API endpoint to handle GET requests
 @app.route('/posts', methods=['GET'])
 def get_posts():
